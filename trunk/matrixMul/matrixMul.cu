@@ -29,11 +29,11 @@ __global__ void init(float *matrix, int size)
 	matrix[tx*size + ty] = 1;
 }
 
-__global__ void step(float *src_v, float *src_w, float *dst_v, float *dst_w, int size, float c1, float c2, float dt, float D, float M)
+__global__ void step(float *src_v, float *src_w, float *dst_v, float *dst_w, int size, float c1, float c2, float dt, float D, float M, R1,R2)
 {
     int x = threadIdx.x;
     int y = threadIdx.y;
-
+	
 	dst_v[x*size+y] =
 		(src_v[x*size+y]
 			+ c1 * dt * (src_v[((x - 1 + size) % size)*size + y] + src_v[((x + 1 + size) % size)*size + y])
@@ -41,9 +41,9 @@ __global__ void step(float *src_v, float *src_w, float *dst_v, float *dst_w, int
 			+ src_w[x*size+y] * dt)
 				/ (1 + src_w[x*size+y] * src_w[x*size+y] + D * dt)
 		
-		+ 1 /* R1() */ * (__powf(dt, 0.5)) * M;
+		+ R1 * (__powf(dt, 0.5)) * M;
 
-	dst_w[x*size+y] = (src_w[x*size+y] + src_v[x*size+y] * dt) / (1 + src_v[x*size+y] * src_v[x*size+y] * dt) + 1 /* R1() */ * (__powf(dt, 0.5)) * M;
+	dst_w[x*size+y] = (src_w[x*size+y] + src_v[x*size+y] * dt) / (1 + src_v[x*size+y] * src_v[x*size+y] * dt) +  R2  * (__powf(dt, 0.5)) * M;
 }
 
 

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="Windows-1252"?>
 <VisualStudioProject
 	ProjectType="Visual C++"
-	Version="9.00"
+	Version="9,00"
 	Name="matrixMul"
 	ProjectGUID="{C986E2A6-ABF8-4ABC-B292-63744CC03DFB}"
 	RootNamespace="matrixMul"
@@ -37,6 +37,7 @@
 			/>
 			<Tool
 				Name="Cudart Build Rule"
+				Include="D:\bstse1\common\inc;D:\bstse1\shared\inc"
 				TargetMachinePlatform="0"
 			/>
 			<Tool
@@ -51,7 +52,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="$(CUDA_PATH)/include;./;../../common/inc;../../../shared/inc"
+				AdditionalIncludeDirectories="&quot;$(CUDA_PATH)/include&quot;;./;D:\bstse1\common\inc;D:\bstse1\shared\inc;$(NOINHERIT)"
 				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -75,10 +76,94 @@
 				AdditionalDependencies="cudart.lib cutil32D.lib shrUtils32D.lib"
 				OutputFile="../../bin/win32/$(ConfigurationName)/matrixMul.exe"
 				LinkIncremental="1"
-				AdditionalLibraryDirectories="$(CUDA_PATH)/lib/$(PlatformName);../../common/lib;../../../shared/lib"
+				AdditionalLibraryDirectories="&quot;$(CUDA_PATH)/lib/$(PlatformName)&quot;;../common/lib;../shared/lib;&quot;C:\ProgramData\NVIDIA Corporation\NVIDIA GPU Computing SDK 3.2\C\common\lib&quot;;&quot;C:\ProgramData\NVIDIA Corporation\NVIDIA GPU Computing SDK 3.2\C\shared\lib&quot;;&quot;C:\ProgramData\NVIDIA Corporation\NVIDIA GPU Computing SDK 3.2\shared\lib&quot;"
 				GenerateDebugInformation="true"
 				ProgramDatabaseFile="$(OutDir)/matrixMul.pdb"
 				SubSystem="1"
+				RandomizedBaseAddress="1"
+				DataExecutionPrevention="0"
+				TargetMachine="1"
+			/>
+			<Tool
+				Name="VCALinkTool"
+			/>
+			<Tool
+				Name="VCManifestTool"
+			/>
+			<Tool
+				Name="VCXDCMakeTool"
+			/>
+			<Tool
+				Name="VCBscMakeTool"
+			/>
+			<Tool
+				Name="VCFxCopTool"
+			/>
+			<Tool
+				Name="VCAppVerifierTool"
+			/>
+			<Tool
+				Name="VCPostBuildEventTool"
+				CommandLine="IF EXIST cg_variables.h move cg_variables.h $(ConfigurationName)\"
+			/>
+		</Configuration>
+		<Configuration
+			Name="Release|Win32"
+			OutputDirectory="$(ConfigurationName)"
+			IntermediateDirectory="$(ConfigurationName)"
+			ConfigurationType="1"
+			CharacterSet="2"
+			>
+			<Tool
+				Name="VCPreBuildEventTool"
+			/>
+			<Tool
+				Name="VCCustomBuildTool"
+			/>
+			<Tool
+				Name="Cudart Build Rule"
+				GPUDebugInfo="false"
+				TargetMachinePlatform="0"
+				HostDebugInfo="false"
+			/>
+			<Tool
+				Name="VCXMLDataGeneratorTool"
+			/>
+			<Tool
+				Name="VCWebServiceProxyGeneratorTool"
+			/>
+			<Tool
+				Name="VCMIDLTool"
+			/>
+			<Tool
+				Name="VCCLCompilerTool"
+				AdditionalIncludeDirectories="$(CUDA_PATH)/include;./;../../common/inc;../../../shared/inc"
+				PreprocessorDefinitions="WIN32;_CONSOLE"
+				RuntimeLibrary="0"
+				UsePrecompiledHeader="0"
+				WarningLevel="3"
+				Detect64BitPortabilityProblems="true"
+				DebugInformationFormat="3"
+			/>
+			<Tool
+				Name="VCManagedResourceCompilerTool"
+			/>
+			<Tool
+				Name="VCResourceCompilerTool"
+			/>
+			<Tool
+				Name="VCPreLinkEventTool"
+			/>
+			<Tool
+				Name="VCLinkerTool"
+				AdditionalDependencies="cudart.lib cutil32.lib shrUtils32.lib"
+				OutputFile="../../bin/win32/$(ConfigurationName)/matrixMul.exe"
+				LinkIncremental="1"
+				AdditionalLibraryDirectories="$(CUDA_PATH)/lib/$(PlatformName);../../common/lib;../../../shared/lib"
+				GenerateDebugInformation="true"
+				SubSystem="1"
+				OptimizeReferences="2"
+				EnableCOMDATFolding="1"
 				RandomizedBaseAddress="1"
 				DataExecutionPrevention="0"
 				TargetMachine="1"
@@ -167,90 +252,6 @@
 				RandomizedBaseAddress="1"
 				DataExecutionPrevention="0"
 				TargetMachine="17"
-			/>
-			<Tool
-				Name="VCALinkTool"
-			/>
-			<Tool
-				Name="VCManifestTool"
-			/>
-			<Tool
-				Name="VCXDCMakeTool"
-			/>
-			<Tool
-				Name="VCBscMakeTool"
-			/>
-			<Tool
-				Name="VCFxCopTool"
-			/>
-			<Tool
-				Name="VCAppVerifierTool"
-			/>
-			<Tool
-				Name="VCPostBuildEventTool"
-				CommandLine="IF EXIST cg_variables.h move cg_variables.h $(ConfigurationName)\"
-			/>
-		</Configuration>
-		<Configuration
-			Name="Release|Win32"
-			OutputDirectory="$(ConfigurationName)"
-			IntermediateDirectory="$(ConfigurationName)"
-			ConfigurationType="1"
-			CharacterSet="2"
-			>
-			<Tool
-				Name="VCPreBuildEventTool"
-			/>
-			<Tool
-				Name="VCCustomBuildTool"
-			/>
-			<Tool
-				Name="Cudart Build Rule"
-				GPUDebugInfo="false"
-				TargetMachinePlatform="0"
-				HostDebugInfo="false"
-			/>
-			<Tool
-				Name="VCXMLDataGeneratorTool"
-			/>
-			<Tool
-				Name="VCWebServiceProxyGeneratorTool"
-			/>
-			<Tool
-				Name="VCMIDLTool"
-			/>
-			<Tool
-				Name="VCCLCompilerTool"
-				AdditionalIncludeDirectories="$(CUDA_PATH)/include;./;../../common/inc;../../../shared/inc"
-				PreprocessorDefinitions="WIN32;_CONSOLE"
-				RuntimeLibrary="0"
-				UsePrecompiledHeader="0"
-				WarningLevel="3"
-				Detect64BitPortabilityProblems="true"
-				DebugInformationFormat="3"
-			/>
-			<Tool
-				Name="VCManagedResourceCompilerTool"
-			/>
-			<Tool
-				Name="VCResourceCompilerTool"
-			/>
-			<Tool
-				Name="VCPreLinkEventTool"
-			/>
-			<Tool
-				Name="VCLinkerTool"
-				AdditionalDependencies="cudart.lib cutil32.lib shrUtils32.lib"
-				OutputFile="../../bin/win32/$(ConfigurationName)/matrixMul.exe"
-				LinkIncremental="1"
-				AdditionalLibraryDirectories="$(CUDA_PATH)/lib/$(PlatformName);../../common/lib;../../../shared/lib"
-				GenerateDebugInformation="true"
-				SubSystem="1"
-				OptimizeReferences="2"
-				EnableCOMDATFolding="1"
-				RandomizedBaseAddress="1"
-				DataExecutionPrevention="0"
-				TargetMachine="1"
 			/>
 			<Tool
 				Name="VCALinkTool"
@@ -384,6 +385,16 @@
 					/>
 				</FileConfiguration>
 				<FileConfiguration
+					Name="Release|Win32"
+					>
+					<Tool
+						Name="Cudart Build Rule"
+						Include="$(CUDA_PATH)/include;../../common/inc;../../../shared/inc"
+						AddedDependencies="matrixMul_kernel.cu"
+						Runtime="0"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
 					Name="Debug|x64"
 					>
 					<Tool
@@ -392,16 +403,6 @@
 						AddedDependencies="matrixMul_kernel.cu"
 						Optimization="0"
 						Runtime="1"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Release|Win32"
-					>
-					<Tool
-						Name="Cudart Build Rule"
-						Include="$(CUDA_PATH)/include;../../common/inc;../../../shared/inc"
-						AddedDependencies="matrixMul_kernel.cu"
-						Runtime="0"
 					/>
 				</FileConfiguration>
 				<FileConfiguration
@@ -414,10 +415,6 @@
 						Runtime="0"
 					/>
 				</FileConfiguration>
-			</File>
-			<File
-				RelativePath=".\matrixMul_gold.cpp"
-				>
 			</File>
 			<File
 				RelativePath=".\matrixMul_kernel.cu"
@@ -431,7 +428,7 @@
 					/>
 				</FileConfiguration>
 				<FileConfiguration
-					Name="Debug|x64"
+					Name="Release|Win32"
 					ExcludedFromBuild="true"
 					>
 					<Tool
@@ -439,7 +436,7 @@
 					/>
 				</FileConfiguration>
 				<FileConfiguration
-					Name="Release|Win32"
+					Name="Debug|x64"
 					ExcludedFromBuild="true"
 					>
 					<Tool
@@ -455,6 +452,10 @@
 					/>
 				</FileConfiguration>
 			</File>
+			<File
+				RelativePath=".\MersenneTwister_kernel.cu"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="inc"
@@ -464,6 +465,10 @@
 				>
 			</File>
 		</Filter>
+		<File
+			RelativePath=".\MersenneTwister.h"
+			>
+		</File>
 	</Files>
 	<Globals>
 	</Globals>
