@@ -48,6 +48,27 @@ __device__ void step(float *src_v, float *src_w, float *dst_v, float *dst_w, flo
 		stats[i] = dst_v[x*size+y];
 }
 
+__device__ void step1(float *src_v, float *src_w, float *dst_v, float *dst_w, float *stats, int size, float c1, float dt, float D, float M, float R1, float R2, int i)
+{
+    int x = threadIdx.x;
+    
+
+// v1[i + 1, x1] = (v1[x1] + c1 * v1[x1 - 1] * dt + c2 * v1[x1 + 1] * dt + w1[x1] * dt) * Math.Pow(1 + w1[x1] * w1[x1] * dt + D * dt, -1) + R1() * (Math.Pow(dt, 0.5)) * M;
+
+
+	dst_v[x] =
+		(src_v[x]
+			+ c1 * dt * (src_v[(x - 1 + size) % size] + src_v[(x + 1 + size) % size])
+			+ src_w[x] * dt)
+				/ (1 + src_w[x] * src_w[x] + D * dt)
+		
+		+ R1 * (__powf(dt, 0.5)) * M;
+
+	dst_w[x] = (src_w[x] + src_v[x] * dt) / (1 + src_v[x] * src_v[x] * dt) + R2 * (__powf(dt, 0.5)) * M;
+	if(x == 0)
+		stats[i] = dst_v[x];
+}
+
 ////Скопировали необходимый функионал для генерации случайных чсел с нормальным распеределением на GPU из Mersentwisterkernel
 
 __device__ static mt_struct_stripped ds_MT[MT_RNG_COUNT];
@@ -94,8 +115,8 @@ __device__ inline void BoxMuller(float& u1, float& u2){
 
 __global__ void RandomGPU(int nPerRng, float *src_v, float *src_w, float *dst_v, float *dst_w, float *stats, int size, float c1, float c2, float dt, float D, float M)
 {
-    const int tid = threadIdx.x * size + threadIdx.y;
-
+   // const int tid = threadIdx.x * size + threadIdx.y;
+    const int tid = threadIdx.x;
     int iState, iState1, iStateM, iOut;
     unsigned int mti, mti1, mtiM, x;
     unsigned int mt[MT_NN], matrix_a, mask_b, mask_c; 
@@ -146,9 +167,9 @@ __global__ void RandomGPU(int nPerRng, float *src_v, float *src_w, float *dst_v,
 			BoxMuller(x1, x2);
 
 			if(iOut % 4 == 1)
-				step(src_v, src_w, dst_v, dst_w, stats, size, c1, c2, dt, D, M, x1, x2, iOut / 2);
+				step1(src_v, src_w, dst_v, dst_w, stats, size, c1, dt, D, M, x1, x2, iOut / 2);
 			else
-				step(dst_v, dst_w, src_v, src_w, stats, size, c1, c2, dt, D, M, x1, x2, iOut / 2);
+				step1(dst_v, dst_w, src_v, src_w, stats, size, c1, dt, D, M, x1, x2, iOut / 2);
 		}
     }
 }
