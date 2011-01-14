@@ -38,7 +38,8 @@
 			<Tool
 				Name="Cudart Build Rule"
 				Include="D:\bstse1\common\inc;D:\bstse1\shared\inc"
-				TargetMachinePlatform="0"
+				GPUDebugInfo="true"
+				NvccCompilation="0"
 			/>
 			<Tool
 				Name="VCXMLDataGeneratorTool"
@@ -452,10 +453,6 @@
 					/>
 				</FileConfiguration>
 			</File>
-			<File
-				RelativePath=".\MersenneTwister_kernel.cu"
-				>
-			</File>
 		</Filter>
 		<Filter
 			Name="inc"
@@ -464,11 +461,11 @@
 				RelativePath=".\matrixMul.h"
 				>
 			</File>
+			<File
+				RelativePath=".\MersenneTwister.h"
+				>
+			</File>
 		</Filter>
-		<File
-			RelativePath=".\MersenneTwister.h"
-			>
-		</File>
 	</Files>
 	<Globals>
 	</Globals>

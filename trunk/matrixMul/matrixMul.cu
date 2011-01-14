@@ -1,6 +1,7 @@
 // Utilities and system includes
 #include <shrUtils.h>
 #include <iostream>
+#include <fstream>
 #include "cutil_inline.h"
 
 // includes, kernels
@@ -19,33 +20,6 @@ void computeGold(float*, const float*, const float*, unsigned int, unsigned int,
 
 //__global__ void
 //matrixMul( float* C, float* A, float* B, int wA, int wB)
-
-__global__ void init(float *matrix, int size)
-{
-    int tx = threadIdx.x;
-    int ty = threadIdx.y;
-
-	// Здесь можно сделать инициализацию
-	matrix[tx*size + ty] = 1;
-}
-
-__global__ void step(float *src_v, float *src_w, float *dst_v, float *dst_w, int size, float c1, float c2, float dt, float D, float M, R1,R2)
-{
-    int x = threadIdx.x;
-    int y = threadIdx.y;
-	
-	dst_v[x*size+y] =
-		(src_v[x*size+y]
-			+ c1 * dt * (src_v[((x - 1 + size) % size)*size + y] + src_v[((x + 1 + size) % size)*size + y])
-			+ c2 * dt * (src_v[x*size + ((y - 1 + size) % size)] + src_v[x*size + ((y + 1 + size) % size)])
-			+ src_w[x*size+y] * dt)
-				/ (1 + src_w[x*size+y] * src_w[x*size+y] + D * dt)
-		
-		+ R1 * (__powf(dt, 0.5)) * M;
-
-	dst_w[x*size+y] = (src_w[x*size+y] + src_v[x*size+y] * dt) / (1 + src_v[x*size+y] * src_v[x*size+y] * dt) +  R2  * (__powf(dt, 0.5)) * M;
-}
-
 
 ////////////////////////////////////////////////////////////////////////////////
 // Main program
@@ -69,14 +43,16 @@ void runTest(int argc, char** argv)
 {
 	cudaSetDevice(cutGetMaxGflopsDeviceId());
 
-	size_t size = 5, size2 = size*size, bsize = size2 * sizeof(float);
-	float *h_v = new float[size2], *h_w = new float[size2];
+	size_t size = 32, size2 = size*size, bsize = size2 * sizeof(float), count = 2<<15, bcount = count * sizeof(float);
+	
+	float *h_v = new float[size2], *h_w = new float[size2], *h_stats = new float[count];
 
-	float *d_v, *d_w, *d_v2, *d_w2;
+	float *d_v, *d_w, *d_v2, *d_w2, *d_stats;
 	cutilSafeCall(cudaMalloc((void**) &d_v, bsize));
 	cutilSafeCall(cudaMalloc((void**) &d_w, bsize));
 	cutilSafeCall(cudaMalloc((void**) &d_v2, bsize));
 	cutilSafeCall(cudaMalloc((void**) &d_w2, bsize));
+	cutilSafeCall(cudaMalloc((void**) &d_stats, bcount));
 
 	//cutilSafeCall(cudaMemcpy(d_v, h_v, bsize, cudaMemcpyHostToDevice));
 	//cutilSafeCall(cudaMemcpy(d_w, h_w, bsize, cudaMemcpyHostToDevice));
@@ -86,20 +62,32 @@ void runTest(int argc, char** argv)
 	init <<<numBlocks, threadsPerBlock>>>(d_v, size);
 	init <<<numBlocks, threadsPerBlock>>>(d_w, size);
 
-	step <<<numBlocks, threadsPerBlock>>>(d_v, d_w, d_v2, d_w2, size, 2, 2, 0.05, 4, 0.8);
-	step <<<numBlocks, threadsPerBlock>>>(d_v2, d_w2, d_v, d_w, size, 2, 2, 0.05, 4, 0.8);
-	step <<<numBlocks, threadsPerBlock>>>(d_v, d_w, d_v2, d_w2, size, 2, 2, 0.05, 4, 0.8);
-	step <<<numBlocks, threadsPerBlock>>>(d_v2, d_w2, d_v, d_w, size, 2, 2, 0.05, 4, 0.8);
-	step <<<numBlocks, threadsPerBlock>>>(d_v, d_w, d_v2, d_w2, size, 2, 2, 0.05, 4, 0.8);
-	step <<<numBlocks, threadsPerBlock>>>(d_v2, d_w2, d_v, d_w, size, 2, 2, 0.05, 4, 0.8);
-	step <<<numBlocks, threadsPerBlock>>>(d_v, d_w, d_v2, d_w2, size, 2, 2, 0.05, 4, 0.8);
-	step <<<numBlocks, threadsPerBlock>>>(d_v2, d_w2, d_v, d_w, size, 2, 2, 0.05, 4, 0.8);
+	const char *dat_path = shrFindFilePath("MersenneTwister.dat", argv[0]);
+	loadMTGPU(dat_path);
 
-	cutilSafeCall(cudaMemcpy(h_v, d_v2, bsize, cudaMemcpyDeviceToHost));
-	cutilSafeCall(cudaMemcpy(h_w, d_w2, bsize, cudaMemcpyDeviceToHost));
+	seedMTGPU(1001);
 
-	for(int i = 0; i != size2; ++i)
-		std::cout << h_v[i] << " ";
+	RandomGPU<<<numBlocks, threadsPerBlock>>>(2*count, d_v, d_w, d_v2, d_w2, d_stats, size, 0.25, 0.25, 0.05, 1, 0.5);
+
+	//step <<<numBlocks, threadsPerBlock>>>(d_v, d_w, d_v2, d_w2, size, 2, 2, 0.05, 4, 0.8);
+	//step <<<numBlocks, threadsPerBlock>>>(d_v2, d_w2, d_v, d_w, size, 2, 2, 0.05, 4, 0.8);
+	//step <<<numBlocks, threadsPerBlock>>>(d_v, d_w, d_v2, d_w2, size, 2, 2, 0.05, 4, 0.8);
+	//step <<<numBlocks, threadsPerBlock>>>(d_v2, d_w2, d_v, d_w, size, 2, 2, 0.05, 4, 0.8);
+	//step <<<numBlocks, threadsPerBlock>>>(d_v, d_w, d_v2, d_w2, size, 2, 2, 0.05, 4, 0.8);
+	//step <<<numBlocks, threadsPerBlock>>>(d_v2, d_w2, d_v, d_w, size, 2, 2, 0.05, 4, 0.8);
+	//step <<<numBlocks, threadsPerBlock>>>(d_v, d_w, d_v2, d_w2, size, 2, 2, 0.05, 4, 0.8);
+	//step <<<numBlocks, threadsPerBlock>>>(d_v2, d_w2, d_v, d_w, size, 2, 2, 0.05, 4, 0.8);
+
+	//cutilSafeCall(cudaMemcpy(h_v, d_v2, bsize, cudaMemcpyDeviceToHost));
+	//cutilSafeCall(cudaMemcpy(h_w, d_w2, bsize, cudaMemcpyDeviceToHost));
+	cutilSafeCall(cudaMemcpy(h_stats, d_stats, bcount, cudaMemcpyDeviceToHost));
+
+	{
+		std::ofstream output("c:\\output2.txt");
+
+		for(int i = 0; i != count; ++i)
+			output << h_stats[i] << "\t";
+	}
 
 	//unsigned int size_A = uiWA * uiHA;
  //   unsigned int mem_size_A = sizeof(float) * size_A;
