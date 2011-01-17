@@ -22,11 +22,8 @@
 
 __global__ void init(float *matrix, int size)
 {
-    int tx = threadIdx.x;
-    int ty = threadIdx.y;
-
 	// Здесь можно сделать инициализацию
-	matrix[tx*size + ty] = 1;
+	matrix[threadIdx.x + threadIdx.y*size] = 1;
 }
 
 __device__ void step(float *src_v, float *src_w, float *dst_v, float *dst_w, float *stats, int size, float c1, float c2, float dt, float D, float M, float R1, float R2, int i)
@@ -51,10 +48,6 @@ __device__ void step(float *src_v, float *src_w, float *dst_v, float *dst_w, flo
 __device__ void step1(float *src_v, float *src_w, float *dst_v, float *dst_w, float *stats, int size, float c1, float dt, float D, float M, float R1, float R2, int i)
 {
     int x = threadIdx.x;
-    
-
-// v1[i + 1, x1] = (v1[x1] + c1 * v1[x1 - 1] * dt + c2 * v1[x1 + 1] * dt + w1[x1] * dt) * Math.Pow(1 + w1[x1] * w1[x1] * dt + D * dt, -1) + R1() * (Math.Pow(dt, 0.5)) * M;
-
 
 	dst_v[x] =
 		(src_v[x]
@@ -65,8 +58,9 @@ __device__ void step1(float *src_v, float *src_w, float *dst_v, float *dst_w, fl
 		+ R1 * (__powf(dt, 0.5)) * M;
 
 	dst_w[x] = (src_w[x] + src_v[x] * dt) / (1 + src_v[x] * src_v[x] * dt) + R2 * (__powf(dt, 0.5)) * M;
-	if(x == 0)
-		stats[i] = dst_v[x];
+
+	stats[size*x + i] = dst_v[x];
+	
 }
 
 ////Скопировали необходимый функионал для генерации случайных чсел с нормальным распеределением на GPU из Mersentwisterkernel
@@ -98,8 +92,9 @@ void seedMTGPU(unsigned int seed){
 
     for(i = 0; i < MT_RNG_COUNT; i++){
         MT[i]      = h_MT[i];
-        MT[i].seed = seed;
+        MT[i].seed = seed+i;
     }
+	int z= 1;
     CUDA_SAFE_CALL(cudaMemcpyToSymbol(ds_MT, MT, sizeof(h_MT)) );
 
     free(MT);
@@ -171,6 +166,7 @@ __global__ void RandomGPU(int nPerRng, float *src_v, float *src_w, float *dst_v,
 			else
 				step1(dst_v, dst_w, src_v, src_w, stats, size, c1, dt, D, M, x1, x2, iOut / 2);
 		}
+		 __syncthreads();
     }
 }
 
