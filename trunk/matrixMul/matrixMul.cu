@@ -7,7 +7,7 @@
 // includes, kernels
 #include <matrixMul_kernel.cu>
 
-static char *sSDKsample = "matrixMul";
+static char *sSDKsample = "Starting...";
 
 ////////////////////////////////////////////////////////////////////////////////
 // declaration, forward
@@ -38,15 +38,15 @@ int main(int argc, char** argv)
 void runTest(int argc, char** argv)
 {
 	cudaSetDevice(cutGetMaxGflopsDeviceId());
+    // таймер для оценки времени работы программы
+	unsigned int timer = 0;
+    cutilCheckError(cutCreateTimer(&timer));
+    cutilCheckError(cutStartTimer(timer));
 
-//	unsigned int timer = 0;
- //   cutilCheckError(cutCreateTimer(&timer));
-//    cutilCheckError(cutStartTimer(timer));
-
-
+    // Параметры системы
 	size_t
 		// Размер строки в одномерном случае (в элементах)
-		size = 1024,
+		size = 256,
 		// Размер матрицы в двумерном случае (в элементах)
 		size2 = size*size,
 		// Размер матрицы в одномерном случае (в байтах)
@@ -54,7 +54,7 @@ void runTest(int argc, char** argv)
 		// Размер матрицы в двумерном случае (в байтах)
 		bsize2 = size2 * sizeof(float),
 		// Количество итераций по времени
-		count = 2<<15;
+		count = 2<<10;
 
 
 
@@ -68,9 +68,6 @@ void runTest(int argc, char** argv)
 
 	cutilSafeCall(cudaMalloc((void**) &d_stats, count*bsize));
 
-	//cutilSafeCall(cudaMemcpy(d_v, h_v, bsize, cudaMemcpyHostToDevice));
-	//cutilSafeCall(cudaMemcpy(d_w, h_w, bsize, cudaMemcpyHostToDevice));
-
 	dim3 threadsPerBlock(size);
 	int numBlocks = 1;
 	init <<<numBlocks, threadsPerBlock>>>(d_v, size);
@@ -80,40 +77,30 @@ void runTest(int argc, char** argv)
 	loadMTGPU(dat_path);
 	seedMTGPU(1001);
 
-    // __device__ void step(кол во итераций, float *src_v, float *src_w, float *dst_v, float *dst_w, float *stats, int size, float c1, float c2, float dt, float D, float M, float R1, float R2, int i)
-
 	RandomGPU<<<numBlocks, threadsPerBlock>>>(2*count, d_v, d_w, d_v2, d_w2, d_stats, size, 1, 1, 0.06, 2, 0.88);
+	
+	(cutStopTimer(timer));
+     printf("Processing time: %f (ms)\n", cutGetTimerValue( timer));
+
+	cutilCheckError( cutDeleteTimer( timer));
+	cutilCheckError(cutCreateTimer(&timer));
+    cutilCheckError(cutStartTimer(timer));
+	
+	
 	cutilSafeCall(cudaMemcpy(h_stats, d_stats, count*bsize, cudaMemcpyDeviceToHost));
 
-
-
-
-
-
-
-
-
-
-
- 
-
- //  cutilCheckError(cutStopTimer(timer));
-//   double dSeconds = cutGetTimerValue(timer)/((double)count * 1000.0);
- ////   double dNumOps = 2.0 * (double)uiWA * (double)uiHA * (double)uiWB;
- ////   double gflops = 1.0e-9 * dNumOps/dSeconds;
-
- ////   //Log througput, etc
- ////   shrLogEx(LOGBOTH | MASTER, 0, "matrixMul, Throughput = %.4f GFlop/s, Time = %.5f s, Size = %.0f Ops, NumDevsUsed = %d, Workgroup = %u\n", 
- ////           gflops, dSeconds, dNumOps, 1, threads.x * threads.y);
-  //   cutilCheckError(cutDeleteTimer(timer));
+   
 	
-// printf("[ %s ]\n", dSeconds);
+    cutilSafeCall( cudaThreadSynchronize() );
+    (cutStopTimer(timer));
+    printf("Copy device to host: %f (ms)\n", cutGetTimerValue( timer));
+    cutilCheckError( cutDeleteTimer( timer));
+    cutilCheckError(cutCreateTimer(&timer));
+    cutilCheckError(cutStartTimer(timer));
 
 
 
-
-
-	/*{
+	{
 		std::ofstream output("c:\\output2.txt");
 
 		for(int j = 0; j != size; ++j)
@@ -127,8 +114,8 @@ void runTest(int argc, char** argv)
 		
 
 
-	}*/
-
+	}
+    printf("Time of extracting data: %f (ms)\n", cutGetTimerValue( timer));
     cudaThreadExit();
 }
 
