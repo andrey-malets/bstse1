@@ -46,7 +46,7 @@ void runTest(int argc, char** argv)
     // Параметры системы
 	size_t
 		// Размер строки в одномерном случае (в элементах)
-		size = 256,
+		size = 1024,
 		// Размер матрицы в двумерном случае (в элементах)
 		size2 = size*size,
 		// Размер матрицы в одномерном случае (в байтах)
@@ -54,7 +54,7 @@ void runTest(int argc, char** argv)
 		// Размер матрицы в двумерном случае (в байтах)
 		bsize2 = size2 * sizeof(float),
 		// Количество итераций по времени
-		count = 2<<10;
+		count = 2<<15;
 
 
 
@@ -87,10 +87,15 @@ void runTest(int argc, char** argv)
     cutilCheckError(cutStartTimer(timer));
 	
 	
-	cutilSafeCall(cudaMemcpy(h_stats, d_stats, count*bsize, cudaMemcpyDeviceToHost));
-
-   
+	//cutilSafeCall(cudaMemcpy(h_stats, d_stats, count*bsize, cudaMemcpyDeviceToHost));
 	
+	int count2 = count;
+	for (int i=0; i != count2; ++i)
+	{
+    
+	RandomGPU<<<numBlocks, threadsPerBlock>>>(2, d_v, d_w, d_v2, d_w2, d_stats, size, 1, 1, 0.06, 2, 0.88);
+	
+	}
     cutilSafeCall( cudaThreadSynchronize() );
     (cutStopTimer(timer));
     printf("Copy device to host: %f (ms)\n", cutGetTimerValue( timer));

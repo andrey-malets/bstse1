@@ -453,6 +453,10 @@
 					/>
 				</FileConfiguration>
 			</File>
+			<File
+				RelativePath=".\Rng_warpStandart.cu"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="inc"
