@@ -49,11 +49,12 @@ typedef unsigned long UL;
  }
 
 
-void main2(unsigned *res, int num)
+void main2(unsigned *res, size_t num)
 {
-	int i;
-    settable(12345,65435,34221,12345,9983651,95746118);
-	for(i=1;i<num;i++)
+	
+	size_t i;
+    settable(1345,6542,3221,123453,651,9118);
+	for(i=1; i<num; i++)
 	{
 		res[i]=KISS;
 	} 
@@ -84,7 +85,7 @@ void runTest(int argc, char** argv)
     // Параметры системы
 	size_t
 		// Размер строки в одномерном случае (в элементах)
-		size = 1024,
+		size = 4096,
 		// Размер матрицы в двумерном случае (в элементах)
 		size2 = size*size,
 		// Размер матрицы в одномерном случае (в байтах)
@@ -92,63 +93,46 @@ void runTest(int argc, char** argv)
 		// Размер матрицы в двумерном случае (в байтах)
 		bsize2 = size2 * sizeof(float),
 		// Количество итераций по времени
-		count = 2<<15;
-
-	
+		count = 1 << 15;
    
-    unsigned *devState=0;
-	unsigned *cpu_seed = new unsigned [size]; 
-	float *h_v = new float[size], *h_w = new float[size], *h_stats = new float[count*size],  *h_seed = new float[32];
+	float *h_v = new float[size], *h_w = new float[size], *h_stats = new float[count*size];
 
 	float *d_v, *d_w, *d_v2, *d_w2, *d_stats;
-	unsigned *d_seed; 
+	unsigned *d_seed;
+
 	cutilSafeCall(cudaMalloc((void**) &d_v, bsize));
 	cutilSafeCall(cudaMalloc((void**) &d_w, bsize));
 	cutilSafeCall(cudaMalloc((void**) &d_v2, bsize));
 	cutilSafeCall(cudaMalloc((void**) &d_w2, bsize));	
 	cutilSafeCall(cudaMalloc((void**) &d_stats, count*bsize));
 
-
-
-   // cutilSafeCall(cudaMalloc((void**) &h_seed, 32*sizeof(float)));
-  
-   // На 32 потока требутся одно 32 битное слово состояния
-   // Вычисляем необходимое количество элементов для начального сидирования генератора
+	// На 32 потока требутся одно 32 битное слово состояния
+	// Вычисляем необходимое количество элементов для начального сидирования генератора
 	
-	int threadsPerBlock(size);
-	int numBlocks = 1;
-	int blockDim = 512;
-	//unsigned localStateN = numBlocks*blockDim/32;
-	//unsigned *seed = new unsigned[localStateN];
-//	main2(seed,localStateN);
-//	unsigned  totalStateBytes=4*blockDim/WarpStandard_K*WarpStandard_STATE_WORDS;
-//	cutilSafeCall(cudaMalloc((void**) &d_seed, localStateN * sizeof(unsigned) ));
-    
- 
-    
-	
+	int numBlocks = 8;
+	int blockDim = size/numBlocks;
+	unsigned *h_seed = new unsigned[size];
+	main2(h_seed, size);
 
+	cutilSafeCall(cudaMalloc((void**) &d_seed, size * sizeof(unsigned)));
+    cutilSafeCall(cudaMemcpy(d_seed, h_seed, size * sizeof(unsigned), cudaMemcpyHostToDevice));
 
-	init <<<numBlocks, threadsPerBlock>>>(d_v, size);
-	init <<<numBlocks, threadsPerBlock>>>(d_w, size);
-
-
-
+	init <<<numBlocks, blockDim>>>(d_v);
+	init <<<numBlocks, blockDim>>>(d_w);
 
 	const char *dat_path = shrFindFilePath("MersenneTwister.dat", argv[0]);
 	loadMTGPU(dat_path);
 	seedMTGPU(1001);
 
-	RandomGPU<<<numBlocks, threadsPerBlock>>>(2*count, d_v, d_w, d_v2, d_w2, d_stats, size, 1, 1, 0.06, 2, 0.88);
-//	RandomGPU2<<<numBlocks, threadsPerBlock>>>(WarpStandard_TEST_DATA,2*count, d_v, d_w, d_v2, d_w2, d_stats, size, 1, 1, 0.06, 2, 0.88);
+//	RandomGPU<<<numBlocks, threadsPerBlock>>>(2*count, d_v, d_w, d_v2, d_w2, d_stats, size, 1, 1, 0.06, 2, 0.88);
+	RandomGPU2<<<numBlocks, blockDim>>>(d_seed, count, d_stats, d_v, d_w, d_v2, d_w2, 0.8, 0.7, 0.06, 1.66, 0.88);
 	
 	(cutStopTimer(timer));
-     printf("Processing time: %f (ms)\n", cutGetTimerValue( timer));
+    printf("Processing time: %f (ms)\n", cutGetTimerValue( timer));
 
 	cutilCheckError( cutDeleteTimer( timer));
 	cutilCheckError(cutCreateTimer(&timer));
     cutilCheckError(cutStartTimer(timer));
-	
 	
 	cutilSafeCall(cudaMemcpy(h_stats, d_stats, count*bsize, cudaMemcpyDeviceToHost));
 	
@@ -159,14 +143,13 @@ void runTest(int argc, char** argv)
 	RandomGPU<<<numBlocks, threadsPerBlock>>>(2, d_v, d_w, d_v2, d_w2, d_stats, size, 1, 1, 0.06, 2, 0.88);
 	
 	}*/
-    cutilSafeCall( cudaThreadSynchronize() );
+
+	cutilSafeCall( cudaThreadSynchronize() );
     (cutStopTimer(timer));
     printf("Copy device to host: %f (ms)\n", cutGetTimerValue( timer));
     cutilCheckError( cutDeleteTimer( timer));
     cutilCheckError(cutCreateTimer(&timer));
     cutilCheckError(cutStartTimer(timer));
-
-
 
 	{
 		std::ofstream output("c:\\output2.txt");
@@ -174,15 +157,11 @@ void runTest(int argc, char** argv)
 		for(int j = 0; j != size; ++j)
 		{
 			for(int i = 0; i != count; ++i)
-				output << h_stats[j*size+i] << "\t";
+				output << h_stats[j*count+i] << "\t";
 			output << std::endl;
 		}
-		
-
-		
-
-
 	}
+
     printf("Time of extracting data: %f (ms)\n", cutGetTimerValue( timer));
     cudaThreadExit();
 }

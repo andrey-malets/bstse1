@@ -65,33 +65,18 @@ __device__ void WarpStandard_SaveState(const unsigned *regs, const unsigned *shm
 
 __device__ unsigned WarpStandard_Generate(unsigned *regs, unsigned *shmem)
 {
-#if __DEVICE_EMULATION__
-    __syncthreads();
-#endif
+  __syncthreads();
   unsigned t0=shmem[regs[1]], t1=shmem[regs[2]];
   unsigned res=(t0<<WarpStandard_Z0) ^ (t1>>regs[0]);
-#if __DEVICE_EMULATION__
-    __syncthreads();
-#endif
+  __syncthreads();
   shmem[threadIdx.x]=res;
   return t0+t1;
 };
 
-
-
-
-
-
-
-
-
-
-
-
-__global__ void init(float *matrix, int size)
+__global__ void init(float *matrix)
 {
 	// Здесь можно сделать инициализацию
-	matrix[threadIdx.x + threadIdx.y*size] = 1;
+	matrix[blockDim.y * blockDim.x * blockIdx.x + threadIdx.y * blockDim.x + threadIdx.x] = 1;
 }
 
 __device__ void step(float *src_v, float *src_w, float *dst_v, float *dst_w, float *stats, int size, float c1, float c2, float dt, float D, float M, float R1, float R2, int i)
@@ -113,9 +98,9 @@ __device__ void step(float *src_v, float *src_w, float *dst_v, float *dst_w, flo
 		stats[i] = dst_v[x*size+y];
 }
 
-__device__ void step1(float *src_v, float *src_w, float *dst_v, float *dst_w, float *stats, int size, float c1, float dt, float D, float M, float R1, float R2, int i)
+__device__ void step1(float *stats, int count, int i, float *src_v, float *src_w, float *dst_v, float *dst_w, float c1, float dt, float D, float M, float R1, float R2)
 {
-    int x = threadIdx.x;
+    int x = blockDim.x * blockIdx.x + threadIdx.x, size = blockDim.x * gridDim.x;
 
 	dst_v[x] =
 		(src_v[x]
@@ -127,8 +112,7 @@ __device__ void step1(float *src_v, float *src_w, float *dst_v, float *dst_w, fl
 
 	dst_w[x] = (src_w[x] + src_v[x] * dt) / (1 + src_v[x] * src_v[x] * dt) + R2 * (__powf(dt, 0.5)) * M;
 
-	stats[size*x + i] = dst_v[x];
-	
+	stats[count * x + i] = dst_v[x];
 }
 
 ////Скопировали необходимый функионал для генерации случайных чсел с нормальным распеределением на GPU из Mersentwisterkernel
@@ -178,39 +162,34 @@ __device__ inline void BoxMuller(float& u1, float& u2){
 
 
 
-__global__ void RandomGPU2(unsigned *state, int nPerRng, float *src_v, float *src_w, float *dst_v, float *dst_w, float *stats, int size, float c1, float c2, float dt, float D, float M)
-	{	
+__global__ void RandomGPU2(unsigned *state, int count, float *stats, float *src_v, float *src_w, float *dst_v, float *dst_w, float c1, float c2, float dt, float D, float M)
+{	
+	__shared__ unsigned sharedMemory[1024];
 
-       extern __shared__ unsigned sharedMemory[];
+	unsigned rngRegs[WarpStandard_REG_COUNT];
+	WarpStandard_LoadState(state, rngRegs, sharedMemory);
 
-		
-		 int iOut;
-		 float x1, x2;
-		 unsigned *rngShmem = sharedMemory;
-				
-		 unsigned rngRegs[WarpStandard_REG_COUNT];
-		 WarpStandard_LoadState(state, rngRegs, rngShmem);
-		  for (iOut = 0; iOut < nPerRng; iOut++) 
-		  
-		  {
-			 unsigned u=WarpStandard_Generate(rngRegs, rngShmem);
-			 if (iOut % 2 == 0)
-				x1 = ((float)u + 1.0f) / 4294967296.0f;
-			 else
-			 {
-				x2 = ((float)u + 1.0f) / 4294967296.0f;
-				BoxMuller(x1, x2);
+	for (int iOut = 0; iOut < count; iOut++) 
+	{
+		unsigned
+			n1 = WarpStandard_Generate(rngRegs, sharedMemory),
+			n2 = WarpStandard_Generate(rngRegs, sharedMemory);
 
-				if(iOut % 4 == 1)
-					step1(src_v, src_w, dst_v, dst_w, stats, size, c1, dt, D, M, x1, x2, iOut / 2);
-				else
-					step1(dst_v, dst_w, src_v, src_w, stats, size, c1, dt, D, M, x1, x2, iOut / 2);
-			 }
-			 __syncthreads();
-		  }
+		float 
+			x1 = ((float)n1 + 1.0f) / 4294967296.0f,
+			x2 = ((float)n2 + 1.0f) / 4294967296.0f;
 
+		BoxMuller(x1, x2);
 
+		if(iOut % 2 == 0)
+				step1(stats, count, iOut, src_v, src_w, dst_v, dst_w, c1, dt, D, M, x1, x2);
+		else
+				step1(stats, count, iOut, dst_v, dst_w, src_v, src_w, c1, dt, D, M, x1, x2);
+
+		__syncthreads();
+	}
 }
+
 __global__ void RandomGPU(int nPerRng, float *src_v, float *src_w, float *dst_v, float *dst_w, float *stats, int size, float c1, float c2, float dt, float D, float M)
 {
    // const int tid = threadIdx.x * size + threadIdx.y;
@@ -257,18 +236,18 @@ __global__ void RandomGPU(int nPerRng, float *src_v, float *src_w, float *dst_v,
         //Convert to (0, 1] float and write to global memory
 		// d_Random[tid + iOut * MT_RNG_COUNT] = ((float)x + 1.0f) / 4294967296.0f;
 
-		if (iOut % 2 == 0)
-			x1 = ((float)x + 1.0f) / 4294967296.0f;
-		else
-		{
-			x2 = ((float)x + 1.0f) / 4294967296.0f;
-			BoxMuller(x1, x2);
+		//if (iOut % 2 == 0)
+		//	x1 = ((float)x + 1.0f) / 4294967296.0f;
+		//else
+		//{
+		//	x2 = ((float)x + 1.0f) / 4294967296.0f;
+		//	BoxMuller(x1, x2);
 
-			if(iOut % 4 == 1)
-				step1(src_v, src_w, dst_v, dst_w, stats, size, c1, dt, D, M, x1, x2, iOut / 2);
-			else
-				step1(dst_v, dst_w, src_v, src_w, stats, size, c1, dt, D, M, x1, x2, iOut / 2);
-		}
+		//	if(iOut % 4 == 1)
+		//	//	step1(src_v, src_w, dst_v, dst_w, stats, size, c1, dt, D, M, x1, x2, iOut / 2);
+		//	else
+		//	//	step1(dst_v, dst_w, src_v, src_w, stats, size, c1, dt, D, M, x1, x2, iOut / 2);
+	//	}
 		 __syncthreads();
     }
 }
