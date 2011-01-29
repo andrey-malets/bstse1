@@ -2,8 +2,10 @@
 #include <shrUtils.h>
 #include <iostream>
 #include <fstream>
-#include "cutil_inline.h"
+#include <cutil_inline.h>
 #include <stdio.h>
+#include <cufft.h>
+
 
 // includes, kernels
 #include <matrixMul_kernel.cu>
@@ -51,9 +53,16 @@ typedef unsigned long UL;
 
 void main2(unsigned *res, size_t num)
 {
-	
-	size_t i;
-    settable(1345,6542,3221,123453,651,9118);
+	int a1 = rand();
+	int a2 = rand();
+	int a3 = rand();
+	int a4 = rand();
+	int a5 = rand();
+	int a6 = rand();
+
+   size_t i;
+//     settable(a1,a2,a3,a4,a5,a6);
+   settable(1345,6542,3221,123453,651,9118);
 	for(i=1; i<num; i++)
 	{
 		res[i]=KISS;
@@ -93,23 +102,23 @@ void runTest(int argc, char** argv)
 		// Размер матрицы в двумерном случае (в байтах)
 		bsize2 = size2 * sizeof(float),
 		// Количество итераций по времени
-		count = 1 << 15;
+		count = 1 << 10;
    
 	float *h_v = new float[size], *h_w = new float[size], *h_stats = new float[count*size];
 
 	float *d_v, *d_w, *d_v2, *d_w2, *d_stats;
 	unsigned *d_seed;
-
+	cufftComplex *d_f1;
+	int fftInputSize = count*sizeof(float2);
 	cutilSafeCall(cudaMalloc((void**) &d_v, bsize));
 	cutilSafeCall(cudaMalloc((void**) &d_w, bsize));
 	cutilSafeCall(cudaMalloc((void**) &d_v2, bsize));
 	cutilSafeCall(cudaMalloc((void**) &d_w2, bsize));	
 	cutilSafeCall(cudaMalloc((void**) &d_stats, count*bsize));
-
-	// На 32 потока требутся одно 32 битное слово состояния
-	// Вычисляем необходимое количество элементов для начального сидирования генератора
+	cutilSafeCall(cudaMalloc((void**) &d_f1, fftInputSize));   // для фурье преобразования временной реализации одной точки, 2*count тк надо добавить комплексную часть = 0
 	
-	int numBlocks = 8;
+	
+	int numBlocks = 4;
 	int blockDim = size/numBlocks;
 	unsigned *h_seed = new unsigned[size];
 	main2(h_seed, size);
@@ -120,9 +129,7 @@ void runTest(int argc, char** argv)
 	init <<<numBlocks, blockDim>>>(d_v);
 	init <<<numBlocks, blockDim>>>(d_w);
 
-	const char *dat_path = shrFindFilePath("MersenneTwister.dat", argv[0]);
-	loadMTGPU(dat_path);
-	seedMTGPU(1001);
+
 
 //	RandomGPU<<<numBlocks, threadsPerBlock>>>(2*count, d_v, d_w, d_v2, d_w2, d_stats, size, 1, 1, 0.06, 2, 0.88);
 	RandomGPU2<<<numBlocks, blockDim>>>(d_seed, count, d_stats, d_v, d_w, d_v2, d_w2, 0.8, 0.7, 0.06, 1.66, 0.88);
@@ -135,7 +142,26 @@ void runTest(int argc, char** argv)
     cutilCheckError(cutStartTimer(timer));
 	
 	cutilSafeCall(cudaMemcpy(h_stats, d_stats, count*bsize, cudaMemcpyDeviceToHost));
+	// <---------------   тут надо вызывать функцию которая будет забивать нулями комплексную часть исходного массива для фурье
+	//фурье 
+	cufftHandle fftPlan;  
+	  
+	cufftPlan1d(&fftPlan, count, CUFFT_C2R, 1); 
+
 	
+	
+	
+	
+
+
+
+
+
+
+
+
+
+
 	/*int count2 = count;
 	for (int i=0; i != count2; ++i)
 	{
