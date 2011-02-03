@@ -47,19 +47,23 @@ const unsigned WarpStandard_GMEM_WORDS=0;
 
 __device__ void WarpStandard_LoadState(const unsigned *seed, unsigned *regs, unsigned *shmem)
 {
-  unsigned offset=(threadIdx.x + threadIdx.y) % 32;  unsigned base=threadIdx.x-offset;
+  unsigned offset = threadIdx.x % 32, base = threadIdx.x + blockDim.x * threadIdx.y - offset;
   // setup constants
   regs[0]=WarpStandard_Z1[offset];
   regs[1]=base + WarpStandard_Q[0][offset];
   regs[2]=base + WarpStandard_Q[1][offset];
   // Setup state
-  unsigned stateOff=blockDim.x * blockIdx.x * 1 + threadIdx.x * 1 +  blockDim.y * blockIdx.y * 1 + threadIdx.y * 1;
-  shmem[threadIdx.x*blockDim.x + threadIdx.y]=seed[stateOff];
+  unsigned stateOff =
+	  blockDim.x * blockDim.y * (blockIdx.x + gridDim.x * blockIdx.y)
+	  + threadIdx.x + blockDim.x * threadIdx.y;
+  shmem[threadIdx.x + blockDim.x * threadIdx.y] = seed[stateOff];
 }
 
 __device__ void WarpStandard_SaveState(const unsigned *regs, const unsigned *shmem, unsigned *seed)
 {
-  unsigned stateOff=blockDim.x * blockIdx.x * 1 + threadIdx.x * 1 + blockDim.y * blockIdx.y * 1 + threadIdx.y * 1;
+  unsigned stateOff =
+	  blockDim.x * blockDim.y * (blockIdx.x + gridDim.x * blockIdx.y)
+	  + threadIdx.x + blockDim.x * threadIdx.y;
   seed[stateOff] = shmem[threadIdx.x*blockDim.x + threadIdx.y];
 }
 
@@ -69,7 +73,7 @@ __device__ unsigned WarpStandard_Generate(unsigned *regs, unsigned *shmem)
   unsigned t0=shmem[regs[1]], t1=shmem[regs[2]];
   unsigned res=(t0<<WarpStandard_Z0) ^ (t1>>regs[0]);
   __syncthreads();
-  shmem[threadIdx.x*blockDim.x+threadIdx.y]=res;
+  shmem[threadIdx.x + blockDim.x * threadIdx.y] = res;
   return t0+t1;
 };
 
@@ -83,7 +87,7 @@ __device__ void step(float *stats, int count,int i, float *src_v, float *src_w, 
 {
    // int x = threadIdx.x;
    // int y = threadIdx.y;
-	int x= blockDim.x * blockIdx.x + threadIdx.x, size = blockDim.x * gridDim.x;
+	int x = blockDim.x * blockIdx.x + threadIdx.x, size = blockDim.x * gridDim.x;
 	int y = blockDim.y * blockIdx.y + threadIdx.y;
 
 
