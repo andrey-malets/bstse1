@@ -35,7 +35,7 @@ const unsigned WarpStandard_GMEM_WORDS=0;
 
 __device__ void WarpStandard_LoadState(const unsigned *seed, unsigned *regs, unsigned *shmem)
 {
-	unsigned offset = threadIdx.x % 32, base = threadIdx.x + blockDim.x * threadIdx.y - offset;
+	unsigned offset = (threadIdx.x + blockDim.x * threadIdx.y) % 32, base = threadIdx.x + blockDim.x * threadIdx.y - offset;
 	// setup constants
 	regs[0]=WarpStandard_Z1[offset];
 	regs[1]=base + WarpStandard_Q[0][offset];
