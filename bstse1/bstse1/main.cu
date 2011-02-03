@@ -95,17 +95,17 @@ void runTest(int argc, char** argv)
     // Параметры системы
 	size_t
 		// Размер строки в одномерном случае (в элементах)
-		size = 64,
+		size = 32,
 		// Размер матрицы в двумерном случае (в элементах)
-		size2 = size*size,
+		size2 = size * size,
 		// Размер матрицы в одномерном случае (в байтах)
 		bsize = size * sizeof(float),
 		// Размер матрицы в двумерном случае (в байтах)
 		bsize2 = size2 * sizeof(float),
 		// Количество итераций по времени
-		count = 1 << 7;
+		count = 1024;
    
-	float *h_v = new float[size2], *h_w = new float[size2], *h_stats = new float[count*size];
+	float *h_v = new float[size2], *h_w = new float[size2], *h_stats = new float[count*size2];
 
 	float *d_v, *d_w, *d_v2, *d_w2, *d_stats;
 	unsigned *d_seed;
@@ -115,11 +115,11 @@ void runTest(int argc, char** argv)
 	cutilSafeCall(cudaMalloc((void**) &d_w, bsize2));
 	cutilSafeCall(cudaMalloc((void**) &d_v2, bsize2));
 	cutilSafeCall(cudaMalloc((void**) &d_w2, bsize2));	
-	cutilSafeCall(cudaMalloc((void**) &d_stats, count*bsize));
+	cutilSafeCall(cudaMalloc((void**) &d_stats, count * bsize2));
 //	cutilSafeCall(cudaMalloc((void**) &d_f1, fftInputSize));   // для фурье преобразования временной реализации одной точки, 2*count тк надо добавить комплексную часть = 0
 	
 	//int numBlocks = 4;
-	dim3 blockDim(32,32);
+	dim3 blockDim(16,16);
 	dim3 numBlocks(size/blockDim.x,size/blockDim.y);
 	unsigned *h_seed = new unsigned[size2];
 	main2(h_seed, size2);
@@ -131,7 +131,8 @@ void runTest(int argc, char** argv)
 	init <<<numBlocks, blockDim>>>(d_w);
 
 //	RandomGPU<<<numBlocks, threadsPerBlock>>>(2*count, d_v, d_w, d_v2, d_w2, d_stats, size, 1, 1, 0.06, 2, 0.88);
-	RandomGPU2<<<numBlocks, blockDim>>>(d_seed, 2*count, d_stats, d_v, d_w, d_v2, d_w2, 0.8, 0.7, 0.06, 1.66, 0.88);
+	RandomGPU2<<<numBlocks, blockDim>>>(d_seed, count, d_stats, d_v, d_w, d_v2, d_w2, 0.8, 0.7, 0.06, 1.66, 0.88);
+	printf("%s\n", cudaGetErrorString(cudaGetLastError()));
 	
 	(cutStopTimer(timer));
     printf("Processing time: %f (ms)\n", cutGetTimerValue( timer));
@@ -140,7 +141,7 @@ void runTest(int argc, char** argv)
 	cutilCheckError(cutCreateTimer(&timer));
     cutilCheckError(cutStartTimer(timer));
 	
-	cutilSafeCall(cudaMemcpy(h_stats, d_stats, count*bsize, cudaMemcpyDeviceToHost));
+	cutilSafeCall(cudaMemcpy(h_stats, d_stats, count * bsize2, cudaMemcpyDeviceToHost));
 	// <---------------   тут надо вызывать функцию которая будет забивать нулями комплексную часть исходного массива для фурье
 	//фурье 
 	//cufftHandle fftPlan;  
@@ -155,9 +156,9 @@ void runTest(int argc, char** argv)
     cutilCheckError(cutStartTimer(timer));
 
 	{
-		std::ofstream output("C:\\output2.txt");
+		std::ofstream output("G:\\output2.txt");
 
-		for(int j = 0; j != size; ++j)
+		for(int j = 0; j != 2; ++j)
 		{
 			for(int i = 0; i != count; ++i)
 				output << h_stats[j*count+i] << "\t";
