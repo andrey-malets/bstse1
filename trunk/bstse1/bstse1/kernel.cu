@@ -47,20 +47,20 @@ const unsigned WarpStandard_GMEM_WORDS=0;
 
 __device__ void WarpStandard_LoadState(const unsigned *seed, unsigned *regs, unsigned *shmem)
 {
-  unsigned offset=threadIdx.x % 32;  unsigned base=threadIdx.x-offset;
+  unsigned offset=(threadIdx.x + threadIdx.y) % 32;  unsigned base=threadIdx.x-offset;
   // setup constants
   regs[0]=WarpStandard_Z1[offset];
   regs[1]=base + WarpStandard_Q[0][offset];
   regs[2]=base + WarpStandard_Q[1][offset];
   // Setup state
-  unsigned stateOff=blockDim.x * blockIdx.x * 1 + threadIdx.x * 1;
-  shmem[threadIdx.x]=seed[stateOff];
+  unsigned stateOff=blockDim.x * blockIdx.x * 1 + threadIdx.x * 1 +  blockDim.y * blockIdx.y * 1 + threadIdx.y * 1;
+  shmem[threadIdx.x*blockDim.x + threadIdx.y]=seed[stateOff];
 }
 
 __device__ void WarpStandard_SaveState(const unsigned *regs, const unsigned *shmem, unsigned *seed)
 {
-  unsigned stateOff=blockDim.x * blockIdx.x * 1 + threadIdx.x * 1;
-  seed[stateOff] = shmem[threadIdx.x];
+  unsigned stateOff=blockDim.x * blockIdx.x * 1 + threadIdx.x * 1 + blockDim.y * blockIdx.y * 1 + threadIdx.y * 1;
+  seed[stateOff] = shmem[threadIdx.x*blockDim.x + threadIdx.y];
 }
 
 __device__ unsigned WarpStandard_Generate(unsigned *regs, unsigned *shmem)
@@ -69,7 +69,7 @@ __device__ unsigned WarpStandard_Generate(unsigned *regs, unsigned *shmem)
   unsigned t0=shmem[regs[1]], t1=shmem[regs[2]];
   unsigned res=(t0<<WarpStandard_Z0) ^ (t1>>regs[0]);
   __syncthreads();
-  shmem[threadIdx.x]=res;
+  shmem[threadIdx.x*blockDim.x+threadIdx.y]=res;
   return t0+t1;
 };
 
@@ -79,11 +79,14 @@ __global__ void init(float *matrix)
 	matrix[blockDim.y * blockDim.x * blockIdx.x + threadIdx.y * blockDim.x + threadIdx.x] = 1;
 }
 
-__device__ void step(float *src_v, float *src_w, float *dst_v, float *dst_w, float *stats, int size, float c1, float c2, float dt, float D, float M, float R1, float R2, int i)
+__device__ void step(float *stats, int count,int i, float *src_v, float *src_w, float *dst_v, float *dst_w,  float c1, float c2, float dt, float D, float M, float R1, float R2)
 {
-    int x = threadIdx.x;
-    int y = threadIdx.y;
-	
+   // int x = threadIdx.x;
+   // int y = threadIdx.y;
+	int x= blockDim.x * blockIdx.x + threadIdx.x, size = blockDim.x * gridDim.x;
+	int y = blockDim.y * blockIdx.y + threadIdx.y;
+
+
 	dst_v[x*size+y] =
 		(src_v[x*size+y]
 			+ c1 * dt * (src_v[((x - 1 + size) % size)*size + y] + src_v[((x + 1 + size) % size)*size + y])
@@ -94,8 +97,9 @@ __device__ void step(float *src_v, float *src_w, float *dst_v, float *dst_w, flo
 		+ R1 * (__powf(dt, 0.5)) * M;
 
 	dst_w[x*size+y] = (src_w[x*size+y] + src_v[x*size+y] * dt) / (1 + src_v[x*size+y] * src_v[x*size+y] * dt) + R2 * (__powf(dt, 0.5)) * M;
-	if(x == 0 && y == 0)
-		stats[i] = dst_v[x*size+y];
+	if(y == 11) // пока выводим одну линию кадрата. 
+	// stats[count * x + i] =  dst_v[x*size+y];
+	 stats[count * x + i] =  R1;
 }
 
 __device__ void step1(float *stats, int count, int i, float *src_v, float *src_w, float *dst_v, float *dst_w, float c1, float dt, float D, float M, float R1, float R2)
@@ -143,11 +147,11 @@ __global__ void RandomGPU2(unsigned *state, int count, float *stats, float *src_
 			x2 = ((float)n2 + 1.0f) / 4294967296.0f;
 
 		BoxMuller(x1, x2);
-
+		
 		if(iOut % 2 == 0)
-				step1(stats, count, iOut, src_v, src_w, dst_v, dst_w, c1, dt, D, M, x1, x2);
+				step(stats, count, iOut, src_v, src_w, dst_v, dst_w, c1, c2, dt, D, M, x1, x2);
 		else
-				step1(stats, count, iOut, dst_v, dst_w, src_v, src_w, c1, dt, D, M, x1, x2);
+				step(stats, count, iOut, dst_v, dst_w, src_v, src_w, c1, c2, dt, D, M, x1, x2);
 
 		__syncthreads();
 		
