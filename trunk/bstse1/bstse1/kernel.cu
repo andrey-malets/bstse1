@@ -73,25 +73,21 @@ __global__ void init(float *matrix)
 
 __device__ void step(float *stats, int count,int i, float *src_v, float *src_w, float *dst_v, float *dst_w,  float c1, float c2, float dt, float D, float M, float R1, float R2)
 {
-   // int x = threadIdx.x;
-   // int y = threadIdx.y;
 	int x = blockDim.x * blockIdx.x + threadIdx.x, size = blockDim.x * gridDim.x;
 	int y = blockDim.y * blockIdx.y + threadIdx.y;
 
-
-	dst_v[x*size+y] =
-		(src_v[x*size+y]
-			+ c1 * dt * (src_v[((x - 1 + size) % size)*size + y] + src_v[((x + 1 + size) % size)*size + y])
-			+ c2 * dt * (src_v[x*size + ((y - 1 + size) % size)] + src_v[x*size + ((y + 1 + size) % size)])
-			+ src_w[x*size+y] * dt)
-				/ (1 + src_w[x*size+y] * src_w[x*size+y] + D * dt)
+	dst_v[x+y*size] =
+		(src_v[x+y*size]
+			+ c1 * dt * (src_v[((x - 1 + size) % size) + y*size] + src_v[((x + 1 + size) % size) + y*size])
+			+ c2 * dt * (src_v[x + ((y - 1 + size) % size)*size] + src_v[x + ((y + 1 + size) % size)*size])
+			+ src_w[x+y*size] * dt)
+				/ (1 + src_w[x+y*size] * src_w[x+y*size] + D * dt)
 		
 		+ R1 * (__powf(dt, 0.5)) * M;
 
-	dst_w[x*size+y] = (src_w[x*size+y] + src_v[x*size+y] * dt) / (1 + src_v[x*size+y] * src_v[x*size+y] * dt) + R2 * (__powf(dt, 0.5)) * M;
-	if(y == 11) // пока выводим одну линию кадрата. 
-	// stats[count * x + i] =  dst_v[x*size+y];
-	 stats[count * x + i] =  R1;
+	dst_w[x+y*size] = (src_w[x+y*size] + src_v[x+y*size] * dt) / (1 + src_v[x+y*size] * src_v[x+y*size] * dt) + R2 * (__powf(dt, 0.5)) * M;
+	if(y == 11)
+		stats[count * x + i] =  R1;
 }
 
 __device__ void step1(float *stats, int count, int i, float *src_v, float *src_w, float *dst_v, float *dst_w, float c1, float dt, float D, float M, float R1, float R2)
@@ -138,13 +134,6 @@ __global__ void RandomGPU2(unsigned *state, int count, float *stats, float *src_
 
 		BoxMuller(x1, x2);
 
-/*
-		if(threadIdx.x == 0 && threadIdx.y == 0)
-		{
-			stats[iOut*2] = x1;
-			stats[iOut*2 + 1] = x2;
-		}
-*/
 		if(iOut % 2 == 0)
 				step(stats, count, iOut, src_v, src_w, dst_v, dst_w, c1, c2, dt, D, M, x1, x2);
 		else
