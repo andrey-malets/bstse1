@@ -5,9 +5,6 @@
 #include <stdio.h>
 #include <shrUtils.h>
 
-
-//#include <cstdint>
-
 /////////////////////////////////////////////////////////////////////////////////////
 // Public constants
 
@@ -15,18 +12,9 @@ const unsigned WarpStandard_K=32;
 const unsigned WarpStandard_REG_COUNT=3;
 const unsigned WarpStandard_STATE_WORDS=32;
 
-const unsigned WarpStandard_TEST_DATA[WarpStandard_STATE_WORDS]={
-	0x8cf35fea, 0xe1dd819e, 0x4a7d0a8e, 0xe0c05911, 0xfd053b8d, 0x30643089, 0x6f6ac111, 0xc4869595,
-	0x9416b7be, 0xe6d329e8, 0x5af0f5bf, 0xc5c742b5, 0x7197e922, 0x71aa35b4, 0x2070b9d1, 0x2bb34804,
-	0x7754a517, 0xe725315e, 0x7f9dd497, 0x043b58bf, 0x83ffa33d, 0x2532905a, 0xbdfe0c8a, 0x16f68671,
-	0x0d14da2e, 0x847efd5f, 0x1edeec64, 0x1bebdf9b, 0xf74d4ff3, 0xd404774b, 0x8ee32599, 0xefe0c405
-};
-
 //////////////////////////////////////////////////////////////////////////////////////
 // Private constants
 
-const char *WarpStandard_name="WarpRNG[CorrelatedU32Rng;k=32;g=16;rs=0;w=32;n=1024;hash=deac2e12ec6e615]";
-const char *WarpStandard_post_processing="addtaps";
 const unsigned WarpStandard_N=1024;
 const unsigned WarpStandard_W=32;
 const unsigned WarpStandard_G=16;
@@ -47,34 +35,34 @@ const unsigned WarpStandard_GMEM_WORDS=0;
 
 __device__ void WarpStandard_LoadState(const unsigned *seed, unsigned *regs, unsigned *shmem)
 {
-  unsigned offset = threadIdx.x % 32, base = threadIdx.x + blockDim.x * threadIdx.y - offset;
-  // setup constants
-  regs[0]=WarpStandard_Z1[offset];
-  regs[1]=base + WarpStandard_Q[0][offset];
-  regs[2]=base + WarpStandard_Q[1][offset];
-  // Setup state
-  unsigned stateOff =
-	  blockDim.x * blockDim.y * (blockIdx.x + gridDim.x * blockIdx.y)
-	  + threadIdx.x + blockDim.x * threadIdx.y;
-  shmem[threadIdx.x + blockDim.x * threadIdx.y] = seed[stateOff];
+	unsigned offset = threadIdx.x % 32, base = threadIdx.x + blockDim.x * threadIdx.y - offset;
+	// setup constants
+	regs[0]=WarpStandard_Z1[offset];
+	regs[1]=base + WarpStandard_Q[0][offset];
+	regs[2]=base + WarpStandard_Q[1][offset];
+	// Setup state
+	unsigned stateOff =
+		blockDim.x * blockDim.y * (blockIdx.x + gridDim.x * blockIdx.y)
+		+ threadIdx.x + blockDim.x * threadIdx.y;
+	shmem[threadIdx.x + blockDim.x * threadIdx.y] = seed[stateOff];
 }
 
 __device__ void WarpStandard_SaveState(const unsigned *regs, const unsigned *shmem, unsigned *seed)
 {
-  unsigned stateOff =
-	  blockDim.x * blockDim.y * (blockIdx.x + gridDim.x * blockIdx.y)
-	  + threadIdx.x + blockDim.x * threadIdx.y;
-  seed[stateOff] = shmem[threadIdx.x*blockDim.x + threadIdx.y];
+	unsigned stateOff =
+		blockDim.x * blockDim.y * (blockIdx.x + gridDim.x * blockIdx.y)
+		+ threadIdx.x + blockDim.x * threadIdx.y;
+	seed[stateOff] = shmem[threadIdx.x*blockDim.x + threadIdx.y];
 }
 
 __device__ unsigned WarpStandard_Generate(unsigned *regs, unsigned *shmem)
 {
-  __syncthreads();
-  unsigned t0=shmem[regs[1]], t1=shmem[regs[2]];
-  unsigned res=(t0<<WarpStandard_Z0) ^ (t1>>regs[0]);
-  __syncthreads();
-  shmem[threadIdx.x + blockDim.x * threadIdx.y] = res;
-  return t0+t1;
+	__syncthreads();
+	unsigned t0=shmem[regs[1]], t1=shmem[regs[2]];
+	unsigned res=(t0<<WarpStandard_Z0) ^ (t1>>regs[0]);
+	__syncthreads();
+	shmem[threadIdx.x + blockDim.x * threadIdx.y] = res;
+	return t0+t1;
 };
 
 __global__ void init(float *matrix)
@@ -131,8 +119,6 @@ __device__ inline void BoxMuller(float& u1, float& u2){
     u2 = r * __sinf(phi);
 }
 
-
-
 __global__ void RandomGPU2(unsigned *state, int count, float *stats, float *src_v, float *src_w, float *dst_v, float *dst_w, float c1, float c2, float dt, float D, float M)
 {	
 	__shared__ unsigned sharedMemory[1024];
@@ -151,15 +137,20 @@ __global__ void RandomGPU2(unsigned *state, int count, float *stats, float *src_
 			x2 = ((float)n2 + 1.0f) / 4294967296.0f;
 
 		BoxMuller(x1, x2);
-		
+
+/*
+		if(threadIdx.x == 0 && threadIdx.y == 0)
+		{
+			stats[iOut*2] = x1;
+			stats[iOut*2 + 1] = x2;
+		}
+*/
 		if(iOut % 2 == 0)
 				step(stats, count, iOut, src_v, src_w, dst_v, dst_w, c1, c2, dt, D, M, x1, x2);
 		else
 				step(stats, count, iOut, dst_v, dst_w, src_v, src_w, c1, c2, dt, D, M, x1, x2);
 
 		__syncthreads();
-		
-
 	}
 }
 
