@@ -6,6 +6,8 @@
 #include <stdio.h>
 #include <cufft.h>
 #include <time.h>
+using namespace std;
+
 
 
 // includes, kernels
@@ -63,8 +65,8 @@ void main2(unsigned *res, size_t num)
 	int a6 = rand();
 
    size_t i;
- //    settable(a1,a2,a3,a4,a5,a6);
-   settable(1345,6542,3221,123453,651,9118);
+   settable(a1,a2,a3,a4,a5,a6);
+  // settable(1345,6542,3221,123453,651,9118);
 	for(i=1; i<num; i++)
 	{
 		res[i]=KISS;
@@ -73,29 +75,28 @@ void main2(unsigned *res, size_t num)
 
 int main(int argc, char** argv)
 {
-	printf("[ %s ]\n", sSDKsample);
-/*
-    shrSetLogFileName ("matrixMul.txt");
-    shrLog("%s Starting...\n\n", argv[0]);*/
-	
-    runTest(argc, argv);
 
-   /* shrEXIT(argc, (const char**)argv);*/
+	printf("[ %s ]\n", sSDKsample);
+	char ans;
+		do 
+		{ 
+			runTest(argc, argv);
+			printf("Do you want to run again ? Y/N \n");
+			cin>>ans;
+		}  
+		while (ans != 'n');
+
 }
 
 
 void runTest(int argc, char** argv)
 {
-	cudaSetDevice(cutGetMaxGflopsDeviceId());
-    // таймер для оценки времени работы программы
-	unsigned int timer = 0;
-    cutilCheckError(cutCreateTimer(&timer));
-    cutilCheckError(cutStartTimer(timer));
+	
 
     // Параметры системы
 	size_t
 		// Размер строки в одномерном случае (в элементах)
-		size = 64,
+		size = 256,
 		// Размер матрицы в двумерном случае (в элементах)
 		size2 = size * size,
 		// Размер матрицы в одномерном случае (в байтах)
@@ -103,51 +104,109 @@ void runTest(int argc, char** argv)
 		// Размер матрицы в двумерном случае (в байтах)
 		bsize2 = size2 * sizeof(float),
 		// Количество итераций по времени
-		count = 1<<10;
-   
-	float *h_v = new float[size2], *h_w = new float[size2], *h_stats = new float[count*size];
+		count = 1<<15;
+		// параметры счёта
+		float dt = 0.005, 
+		// шаг по времени
+		m = 0.075,
+		// интенсивность шума
+		d1 = 1;
+		// количество сохраняемых данных
+		int sn = 1;
+		//массив с номерами строк матрицы для сохранения и последующей обработки
+		int cif;
+		//X или Y строки сохраняем.
+		int XY;
+	/*	printf("Enter parametrs of system: Time(dt), Noise(m), Diffusion(d1), Number of saved lines(sn) \n");
+		printf("default values 0.005, 0.075, 1, 1 \n");
+		scanf("%f%f%f%i", &dt, &m, &d1, &sn);
+		*/
+		/*cout<<"Enter number of save lines";
+		cin>>sn;
+		unsigned* h_nsavedata= new unsigned[sn];
+		  for(int i=0; i<sn; i++)
+			 {
+				 cout<<"Enter coordinate for " <<i<<" line ";
+				 cin>>cif;
+				 h_nsavedata[i]=cif;
+			 }*/
+		
+	  
+
+
+
+	    double dt1 = (double) dt;
+	    float c1 = (float)0.5*m/pow(dt1,0.5),c2 = (float)0.5*m/pow(dt1,0.5), D = (float) 2*m/pow(dt1, 0.5)*d1;
+	
+	cudaSetDevice(cutGetMaxGflopsDeviceId());
+    // таймер для оценки времени работы программы
+	unsigned int timer = 0;
+    cutilCheckError(cutCreateTimer(&timer));
+    cutilCheckError(cutStartTimer(timer));
+
+
+
+	float *h_v = new float[size2], *h_w = new float[size2], *h_stats = new float[count*size*sn], *h_fft = new float[(count/2)*size];
 
 	float *d_v, *d_w, *d_v2, *d_w2, *d_stats;
-	unsigned *d_seed;
+	unsigned *d_seed, *d_nsavedata;
 	cufftComplex *d_f1;
-//	int fftInputSize = count*sizeof(float2);
+
 	cutilSafeCall(cudaMalloc((void**) &d_v, bsize2));
 	cutilSafeCall(cudaMalloc((void**) &d_w, bsize2));
 	cutilSafeCall(cudaMalloc((void**) &d_v2, bsize2));
 	cutilSafeCall(cudaMalloc((void**) &d_w2, bsize2));	
-	cutilSafeCall(cudaMalloc((void**) &d_stats, count * bsize));
-//	cutilSafeCall(cudaMalloc((void**) &d_f1, fftInputSize));   // для фурье преобразования временной реализации одной точки, 2*count тк надо добавить комплексную часть = 0
-	
-	//int numBlocks = 4;
-	dim3 blockDim(16,16);
+	cutilSafeCall(cudaMalloc((void**) &d_stats, count * bsize*sn));
+//	cutilSafeCall(cudaMalloc((void**) &d_nsavedata, sn*sizeof(unsigned)));
+	dim3 blockDim(32,32);
 	dim3 numBlocks(size/blockDim.x,size/blockDim.y);
 	unsigned *h_seed = new unsigned[size2];
 	main2(h_seed, size2);
 
 	cutilSafeCall(cudaMalloc((void**) &d_seed, size2 * sizeof(unsigned)));
     cutilSafeCall(cudaMemcpy(d_seed, h_seed, size2 * sizeof(unsigned), cudaMemcpyHostToDevice));
-
+//	cutilSafeCall(cudaMemcpy(d_nsavedata, h_nsavedata, sn * sizeof(unsigned), cudaMemcpyHostToDevice));
 	init <<<numBlocks, blockDim>>>(d_v);
 	init <<<numBlocks, blockDim>>>(d_w);
 
 //	RandomGPU<<<numBlocks, threadsPerBlock>>>(2*count, d_v, d_w, d_v2, d_w2, d_stats, size, 1, 1, 0.06, 2, 0.88);
-	RandomGPU2<<<numBlocks, blockDim>>>(d_seed, count, d_stats, d_v, d_w, d_v2, d_w2, 0.006, 0.7, 0.06, 1.66, 1.88);
-	printf("%s\n", cudaGetErrorString(cudaGetLastError()));
+	RandomGPU2<<<numBlocks, blockDim>>>(d_seed, count, d_stats, d_v, d_w, d_v2, d_w2, c1, c2, dt, D, m);
+	cudaFree(d_seed);
+	cudaFree(d_v);
+    cudaFree(d_w);
+	cudaFree(d_v2);
+	cudaFree(d_w2);
 	
 	(cutStopTimer(timer));
     printf("Processing time: %f (ms)\n", cutGetTimerValue( timer));
+
+
+
 
 	cutilCheckError( cutDeleteTimer( timer));
 	cutilCheckError(cutCreateTimer(&timer));
     cutilCheckError(cutStartTimer(timer));
 	
-	cutilSafeCall(cudaMemcpy(h_stats, d_stats, count * bsize, cudaMemcpyDeviceToHost));
-	// <---------------   тут надо вызывать функцию которая будет забивать нулями комплексную часть исходного массива для фурье
+  // cutilSafeCall(cudaMemcpy(h_stats, d_stats, count * bsize, cudaMemcpyDeviceToHost));
+	
 	//фурье 
-	//cufftHandle fftPlan;  
-	  
-//	cufftPlan1d(&fftPlan, count, CUFFT_C2R, 1); 
-
+	cufftHandle fftPlan;  
+	cufftComplex *d_fft;
+	int numf = size;
+	cufftReal *h = new cufftReal[(count/2+1)*numf]; 
+	float *d_ffta; // для модулей фурье преобразования
+	cudaMalloc((void**)&d_fft,sizeof(cufftComplex)*(count/2+1)*numf);
+	cudaMalloc((void**)&d_ffta,sizeof(cufftReal)*(count/2+1)*numf);
+	cufftPlan1d(&fftPlan, count, CUFFT_R2C, numf);
+	printf("1");
+	cufftExecR2C(fftPlan, d_stats, d_fft);
+	printf("2");
+	cutilSafeCall( cudaThreadSynchronize() );
+	printf("3");
+	ComplexAbs <<<count*size/1024,512>>>(d_fft, d_ffta,(count/2+1)*numf);
+	cutilSafeCall( cudaThreadSynchronize() );
+	printf("4");
+	cutilSafeCall(cudaMemcpy(h, d_ffta, (count/2+1) * numf*sizeof(float), cudaMemcpyDeviceToHost));
 	cutilSafeCall( cudaThreadSynchronize() );
     (cutStopTimer(timer));
     printf("Copy device to host: %f (ms)\n", cutGetTimerValue( timer));
@@ -156,18 +215,45 @@ void runTest(int argc, char** argv)
     cutilCheckError(cutStartTimer(timer));
 
 	{
-		std::ofstream output("C:\\output2.txt");
+		char s[1000];
+        sprintf(s, "C:\\2D s = %i count = %i dt = %f M = %f d1 = %f.txt", size, count, dt, m, d1);
+		std::ofstream output(s);
 
-		for(int j = 0; j != size; ++j)
+		//for(int j = 0; j != numf; ++j)
+		//{
+		//	for(int i = 0; i != count/2+1; ++i)
+		//	{
+		//		output << h[j*(count/2+1)+i] << "\t";
+		//		//output << h[j*(count/2+1)+i]<< "\t";
+		//	}
+		//	output << std::endl;
+		//}
+		//
+	
+		
+		cufftReal *h_fftsum = new cufftReal[count/2+1];
+		for(int i = 0; i != count/2+1; ++i)
+			h_fftsum[i]=0;
+		
+
+		for(int j = 0; j != numf; ++j)
 		{
-			for(int i = 0; i != count; ++i)
-				output << h_stats[j*count+i] << "\t";
-			output << std::endl;
+			for(int i = 0; i != count/2+1; ++i)
+				h_fftsum[i] += h[j*(count/2+1)+i];
 		}
+	/*	output << "size = " << size << "n= " << count << "dt= " << dt << "M= " << m << "d1= " << d1;
+		output << std::endl;*/
+		for(int i = 0; i != count/2+1; ++i)
+		{
+		output << h_fftsum[i]/numf << "\t";
+			
+		}
+		output << std::endl;
 	}
 
     printf("Time of extracting data: %f (ms)\n", cutGetTimerValue( timer));
 	
     cudaThreadExit();
+	
 }
 

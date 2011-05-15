@@ -68,7 +68,7 @@ __device__ unsigned WarpStandard_Generate(unsigned *regs, unsigned *shmem)
 __global__ void init(float *matrix)
 {
 	// Здесь можно сделать инициализацию
-	matrix[blockDim.y * blockDim.x * blockIdx.x + threadIdx.y * blockDim.x + threadIdx.x] = 1;
+	matrix[blockDim.y * blockDim.x * blockIdx.x + threadIdx.y * blockDim.x + threadIdx.x] = 0.2;
 }
 
 __device__ void step(float *stats, int count,int i, float *src_v, float *src_w, float *dst_v, float *dst_w,  float c1, float c2, float dt, float D, float M, float R1, float R2)
@@ -87,7 +87,7 @@ __device__ void step(float *stats, int count,int i, float *src_v, float *src_w, 
 
 	dst_w[x+y*size] = (src_w[x+y*size] + src_v[x+y*size] * dt) / (1 + src_v[x+y*size] * src_v[x+y*size] * dt) + R2 * (__powf(dt, 0.5)) * M;
 	if(y == 11)
-		stats[count * x + i] =  R1;
+		stats[count * x + i] =  dst_v[x+y*size];
 }
 
 __device__ void step1(float *stats, int count, int i, float *src_v, float *src_w, float *dst_v, float *dst_w, float c1, float dt, float D, float M, float R1, float R2)
@@ -142,7 +142,16 @@ __global__ void RandomGPU2(unsigned *state, int count, float *stats, float *src_
 		__syncthreads();
 	}
 }
+__global__ void ComplexAbs (cufftComplex *idata, float *odata, unsigned s)
+{
+	int i = blockDim.x * blockIdx.x + threadIdx.x;
+	
+	
+		odata[i] = __powf(((float)idata[i].x*(float)idata[i].x + (float)idata[i].y*(float)idata[i].y), 0.5);
+	
+		//odata[i] = idata[i].x;
+	
 
-
+}
 
 #endif // #ifndef _MATRIXMUL_KERNEL_H_
