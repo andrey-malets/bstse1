@@ -147,7 +147,7 @@ __global__ void ComplexAbs (cufftComplex *idata, float *odata, unsigned s)
 	int i = blockDim.x * blockIdx.x + threadIdx.x;
 	
 	
-		odata[i] = __powf(((float)idata[i].x*(float)idata[i].x + (float)idata[i].y*(float)idata[i].y), 0.5);
+		odata[i] = __powf(__powf(((float)idata[i].x*(float)idata[i].x + (float)idata[i].y*(float)idata[i].y), 0.5),2);
 	
 		//odata[i] = idata[i].x;
 	
