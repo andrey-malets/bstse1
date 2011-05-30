@@ -68,7 +68,7 @@ __device__ unsigned WarpStandard_Generate(unsigned *regs, unsigned *shmem)
 __global__ void init(float *matrix)
 {
 	// Здесь можно сделать инициализацию
-	matrix[blockDim.y * blockDim.x * blockIdx.x + threadIdx.y * blockDim.x + threadIdx.x] = 0.2;
+	matrix[blockDim.y * blockDim.x * blockIdx.x + threadIdx.y * blockDim.x + threadIdx.x] = 0.02;
 }
 
 __device__ void step(float *stats, int count,int i, float *src_v, float *src_w, float *dst_v, float *dst_w,  float c1, float c2, float dt, float D, float M, float R1, float R2)
