@@ -17,7 +17,7 @@ static char *sSDKsample = "Starting...";
 
 ////////////////////////////////////////////////////////////////////////////////
 // declaration, forward
-void runTest(int argc, char** argv, float dt, float m, float d1);
+void runTest(int argc, char** argv, float dt, float m, float d1, int rr);
 void randomInit(float*, int);
 void printDiff(float*, float*, int, int, int, float);
 
@@ -66,7 +66,7 @@ void main2(unsigned *res, size_t num)
 
    size_t i;
    settable(a1,a2,a3,a4,a5,a6);
-  // settable(1345,6542,3221,123453,651,9118);
+ //  settable(1345,6542,3221,123453,651,9118);
 	for(i=1; i<num; i++)
 	{
 		res[i]=KISS;
@@ -81,21 +81,21 @@ int main(int argc, char** argv)
 		do 
 		{ 
 			//for (int i =0; i < 4; ++i)
-			//	for (int j =0; j < 7; ++j)
-			//	{
-			//		//for (int k =0; k < 5; ++k)
-			//	//	{
-			//			dt = 0.005 + 0.005*i;
-			//			m = 0.060 + 0.005*j;
-			//			d1 = 1;
-			//			runTest(argc, argv, dt, m, d1);
+				/*for (int j =0; j < 40; ++j)
+				{
+					for (int k =0; k < 3; ++k)
+					{
+						dt = 0.5;
+						m = 0.1 + 0.1*j;
+						d1 = 0.8 + 0.2*k;
+						runTest(argc, argv, dt, m, d1);
 
-			//	//	}
+					}
 
 
-			//	}
-			
-			runTest(argc, argv, 0.005, 0.075, 1);
+				}*/
+			for (int k=10; k<16; ++k)
+			runTest(argc, argv, 0.5, 0.1, 1,k);
 			
 			printf("Do you want to run again ? Y/N \n");
 			cin>>ans;
@@ -105,14 +105,14 @@ int main(int argc, char** argv)
 }
 
 
-void runTest(int argc, char** argv, float dt, float m, float d1)
+void runTest(int argc, char** argv, float dt, float m, float d1, int rr)
 {
 	
 
     // Параметры системы
 	size_t
 		// Размер строки в одномерном случае (в элементах)
-		size = 64,
+		size = 256,
 		// Размер матрицы в двумерном случае (в элементах)
 		size2 = size * size,
 		// Размер матрицы в одномерном случае (в байтах)
@@ -120,7 +120,7 @@ void runTest(int argc, char** argv, float dt, float m, float d1)
 		// Размер матрицы в двумерном случае (в байтах)
 		bsize2 = size2 * sizeof(float),
 		// Количество итераций по времени
-		count = 1<<13;
+		count = 1<<10;
 		// параметры счёта
 		//float dt = 0.005, 
 		// шаг по времени
@@ -131,15 +131,17 @@ void runTest(int argc, char** argv, float dt, float m, float d1)
 		int outputV = 1;
 		int outputR = 1;
 		int Rcount =20;
+		//int rr;
 		printf("Enter parametrs of system: \n Time(dt) \n Noise(m) \n Diffusion(d1) \n enter 1 for saving realisation or 0 in another case \n enter 1 for saving result 2d map of variable V or 0 in another case \n enter number of realization for output ");
 		printf("\ndefault values 0.005, 0.075, 1, 1, 1, 20 \n");
-	//	scanf("%f%f%f%i%i%i", &dt, &m, &d1, &outputV, &outputR, &Rcount);
-		
+	//	scanf("%f%f%f%i%i", &dt, &m, &d1,&size,&rr);
+	//	scanf("%i%i",&size,&rr);
+		count = 1<<rr;
 		
 		
 	
 	double dt1 = (double) dt;
-	float c1 = (float)0.5*m/pow(dt1,0.5),c2 = (float)0.5*m/pow(dt1,0.5), D = (float) 2*m/pow(dt1, 0.5)*d1;
+	float c1 = (float)0.5*m/pow(dt1,0.5) ,c2 = (float)0.5*m/pow(dt1,0.5), D = (float) 2*m/pow(dt1, 0.5)*d1;
 	
 	cudaSetDevice(cutGetMaxGflopsDeviceId());
     // таймер для оценки времени работы программы
@@ -160,7 +162,7 @@ void runTest(int argc, char** argv, float dt, float m, float d1)
 	cutilSafeCall(cudaMalloc((void**) &d_v2, bsize2));
 	cutilSafeCall(cudaMalloc((void**) &d_w2, bsize2));	
 	cutilSafeCall(cudaMalloc((void**) &d_stats, count * bsize));
-	dim3 blockDim(16,16);
+	dim3 blockDim(32,32);
 	dim3 numBlocks(size/blockDim.x,size/blockDim.y);
 	unsigned *h_seed = new unsigned[size2];
 	main2(h_seed, size2);
@@ -223,7 +225,7 @@ void runTest(int argc, char** argv, float dt, float m, float d1)
 
 		for(int j = 0; j != Rcount; ++j)
 			{
-				for(int i = 0; i != count; ++i)
+				for(int i = 512; i != count; ++i)
 				{
 					output << h_stats[j*(count)+i] << "\t";
 				
