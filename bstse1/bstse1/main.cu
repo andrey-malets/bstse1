@@ -94,8 +94,8 @@ int main(int argc, char** argv)
 
 
 				}*/
-			for (int k=10; k<16; ++k)
-			runTest(argc, argv, 0.5, 0.1, 1,k);
+			for (int k=12; k<18; ++k)
+			runTest(argc, argv, 0.5, 0.2, 1,k);
 			
 			printf("Do you want to run again ? Y/N \n");
 			cin>>ans;
@@ -141,7 +141,7 @@ void runTest(int argc, char** argv, float dt, float m, float d1, int rr)
 		
 	
 	double dt1 = (double) dt;
-	float c1 = (float)0.5*m/pow(dt1,0.5) ,c2 = (float)0.5*m/pow(dt1,0.5), D = (float) 2*m/pow(dt1, 0.5)*d1;
+	float c1 = (float)0.25*m/pow(dt1,0.5) ,c2 = (float)0.25*m/pow(dt1,0.5), D = (float) 2*m/pow(dt1, 0.5)*d1;
 	
 	cudaSetDevice(cutGetMaxGflopsDeviceId());
     // таймер для оценки времени работы программы
@@ -152,7 +152,7 @@ void runTest(int argc, char** argv, float dt, float m, float d1, int rr)
 
 
 	
-	float *h_v = new float[size2], *h_w = new float[size2], *h_stats = new float[count*size], *h_fft = new float[(count/2)*size];
+	float *h_v = new float[size2], *h_w = new float[size2], *h_stats = new float[(count-512)*size], *h_fft = new float[((count-512)/2)*size];
     float *d_v, *d_w, *d_v2, *d_w2, *d_stats;
 	unsigned *d_seed;
 	cufftComplex *d_f1;
@@ -161,7 +161,7 @@ void runTest(int argc, char** argv, float dt, float m, float d1, int rr)
 	cutilSafeCall(cudaMalloc((void**) &d_w, bsize2));
 	cutilSafeCall(cudaMalloc((void**) &d_v2, bsize2));
 	cutilSafeCall(cudaMalloc((void**) &d_w2, bsize2));	
-	cutilSafeCall(cudaMalloc((void**) &d_stats, count * bsize));
+	cutilSafeCall(cudaMalloc((void**) &d_stats, (count-512) * bsize));
 	dim3 blockDim(32,32);
 	dim3 numBlocks(size/blockDim.x,size/blockDim.y);
 	unsigned *h_seed = new unsigned[size2];
@@ -210,7 +210,7 @@ void runTest(int argc, char** argv, float dt, float m, float d1, int rr)
 
 	if (outputR ==1)																									 // вывод в файл реализаций
 		{
-			cutilSafeCall(cudaMemcpy(h_stats, d_stats, count * bsize, cudaMemcpyDeviceToHost));
+			cutilSafeCall(cudaMemcpy(h_stats, d_stats, (count-512) * bsize, cudaMemcpyDeviceToHost));
 			cutilSafeCall( cudaThreadSynchronize() );
 			(cutStopTimer(timer));
 			printf("Copy device to host Realisation: %f (ms)\n", cutGetTimerValue( timer));
@@ -225,9 +225,9 @@ void runTest(int argc, char** argv, float dt, float m, float d1, int rr)
 
 		for(int j = 0; j != Rcount; ++j)
 			{
-				for(int i = 512; i != count; ++i)
+				for(int i = 0; i != count-512; ++i)
 				{
-					output << h_stats[j*(count)+i] << "\t";
+					output << h_stats[j*(count-512)+i] << "\t";
 				
 				}
 				output << std::endl;
@@ -247,20 +247,20 @@ void runTest(int argc, char** argv, float dt, float m, float d1, int rr)
 	cufftHandle fftPlan;  
 	cufftComplex *d_fft;
 	
-	cufftReal *h = new cufftReal[(count/2+1)*numf]; 
+	cufftReal *h = new cufftReal[((count-512)/2+1)*numf]; 
 	float *d_ffta; // для модулей фурье преобразования
-	cudaMalloc((void**)&d_fft,sizeof(cufftComplex)*(count/2+1)*numf);
-	cudaMalloc((void**)&d_ffta,sizeof(cufftReal)*(count/2+1)*numf);
-	cufftPlan1d(&fftPlan, count, CUFFT_R2C, numf);
+	cudaMalloc((void**)&d_fft,sizeof(cufftComplex)*((count-512)/2+1)*numf);
+	cudaMalloc((void**)&d_ffta,sizeof(cufftReal)*((count-512)/2+1)*numf);
+	cufftPlan1d(&fftPlan, count-512, CUFFT_R2C, numf);
 	
 	cufftExecR2C(fftPlan, d_stats, d_fft);
 	
 	cutilSafeCall( cudaThreadSynchronize() );
 	
-	ComplexAbs <<<count*size/1024,512>>>(d_fft, d_ffta,(count/2+1)*numf);
+	ComplexAbs <<<(count-512)*size/1024,512>>>(d_fft, d_ffta,((count-512)/2+1)*numf);
 	cutilSafeCall( cudaThreadSynchronize() );
 	
-	cutilSafeCall(cudaMemcpy(h, d_ffta, (count/2+1) * numf*sizeof(float), cudaMemcpyDeviceToHost));
+	cutilSafeCall(cudaMemcpy(h, d_ffta, ((count-512)/2+1) * numf*sizeof(float), cudaMemcpyDeviceToHost));
 	
 	cutilSafeCall( cudaThreadSynchronize() );
 
@@ -278,19 +278,19 @@ void runTest(int argc, char** argv, float dt, float m, float d1, int rr)
         sprintf(of, "D:\\2Ds%ic%idt%fM%fd1%fFFF.txt", size, count, dt, m, d1);
 		std::ofstream output(of);
 
-		numf = 64;
-		cufftReal *h_fftsum = new cufftReal[count/2+1];
-		for(int i = 0; i != count/2+1; ++i)
+		numf = size;
+		cufftReal *h_fftsum = new cufftReal[(count-512)/2+1];
+		for(int i = 0; i != (count-512)/2+1; ++i)
 			h_fftsum[i]=0;
 		
 
-		for(int j = 0; j != numf; ++j)
+		for(int j = 32; j != 33; ++j)
 		{
-			for(int i = 0; i != count/2+1; ++i)
-				h_fftsum[i] += h[j*(count/2+1)+i];
+			for(int i = 0; i != (count-512)/2+1; ++i)
+				h_fftsum[i] += h[j*((count-512)/2+1)+i];
 		}
 	
-		for(int i = 0; i != count/2+1; ++i)
+		for(int i = 0; i != (count-512)/2+1; ++i)
 		{
 		output << h_fftsum[i]/numf << "\t";
 			

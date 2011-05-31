@@ -68,7 +68,7 @@ __device__ unsigned WarpStandard_Generate(unsigned *regs, unsigned *shmem)
 __global__ void init(float *matrix)
 {
 	// Здесь можно сделать инициализацию
-	matrix[blockDim.y * blockDim.x * blockIdx.x + threadIdx.y * blockDim.x + threadIdx.x] = 0.02;
+	matrix[blockDim.y * blockDim.x * blockIdx.x + threadIdx.y * blockDim.x + threadIdx.x] = 10;
 }
 
 __device__ void step(float *stats, int count,int i, float *src_v, float *src_w, float *dst_v, float *dst_w,  float c1, float c2, float dt, float D, float M, float R1, float R2)
@@ -86,8 +86,8 @@ __device__ void step(float *stats, int count,int i, float *src_v, float *src_w, 
 		+ R1 * (__powf(dt, 0.5)) * M;
 
 	dst_w[x+y*size] = (src_w[x+y*size] + src_v[x+y*size] * dt) / (1 + src_v[x+y*size] * src_v[x+y*size] * dt) + R2 * (__powf(dt, 0.5)) * M;
-	if(y == 11)
-		stats[count * x + i] =  dst_v[x+y*size];
+	if(y == 11 && i > 511)
+		stats[(count-512) * x + i-512] =  dst_v[x+y*size];
 }
 
 __device__ void step1(float *stats, int count, int i, float *src_v, float *src_w, float *dst_v, float *dst_w, float c1, float dt, float D, float M, float R1, float R2)
